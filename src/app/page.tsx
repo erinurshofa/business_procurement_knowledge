@@ -35,7 +35,7 @@ export default function Home() {
 
   const [contextState, setContextState] = useState<ContextState>({
     activeCompanyId: "aos",
-    activeProjectId: "proj-1",
+    activeProjectId: "proj-aos-1",
     activePersonId: "person-1",
     activeTab: "document",
     searchQuery: "",
@@ -59,7 +59,7 @@ export default function Home() {
   // Run consistency checks on mount & context updates
   useEffect(() => {
     const currentCompany = companies.find((c) => c.id === contextState.activeCompanyId) || companies[0];
-    const currentProject = projects.find((p) => p.id === contextState.activeProjectId);
+    const currentProject = projects.find((p) => p.id === contextState.activeProjectId || p.companyId === contextState.activeCompanyId) || projects[0];
     const result = runConsistencyCheck(currentCompany, currentProject, complianceRecords);
 
     // Merge generated conflicts with mock conflicts without duplicates
@@ -71,7 +71,7 @@ export default function Home() {
   }, [contextState.activeCompanyId, contextState.activeProjectId, companies, projects, complianceRecords]);
 
   // Conversational prompt handler
-  const handleSendMessage = (userPromptText: string) => {
+  const handleSendMessage = async (userPromptText: string) => {
     const userMsg: ChatMessage = {
       id: `msg-user-${Date.now()}`,
       sender: "user",
@@ -81,23 +81,73 @@ export default function Home() {
 
     setMessages((prev) => [...prev, userMsg]);
 
-    // Process intent & get AI response
-    setTimeout(() => {
-      const { assistantResponse, nextState } = processUserConversationalPrompt(
-        userPromptText,
-        contextState,
-        companies,
-        people,
-        experiences
-      );
+    const lower = userPromptText.toLowerCase();
+    if (lower.includes("download surat penawaran")) {
+      window.open(`/api/export-docx?companyId=${contextState.activeCompanyId}&projectId=${contextState.activeProjectId}&docPrefix=0`, "_blank");
+    } else if (lower.includes("download rekap")) {
+      window.open(`/api/export-docx?companyId=${contextState.activeCompanyId}&projectId=${contextState.activeProjectId}&docPrefix=1`, "_blank");
+    } else if (lower.includes("download kuantitas") || lower.includes("harga")) {
+      window.open(`/api/export-docx?companyId=${contextState.activeCompanyId}&projectId=${contextState.activeProjectId}&docPrefix=2`, "_blank");
+    } else if (lower.includes("download remunerasi")) {
+      window.open(`/api/export-docx?companyId=${contextState.activeCompanyId}&projectId=${contextState.activeProjectId}&docPrefix=3`, "_blank");
+    }
 
-      setContextState(nextState);
-      setMessages((prev) => [...prev, assistantResponse]);
-    }, 400);
+    try {
+      const res = await fetch("/api/ai-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          promptText: userPromptText,
+          contextState,
+          companies,
+          people,
+          experiences,
+          projects,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.assistantResponse && data.nextState) {
+          const targetCompanyProject = projects.find((p) => p.companyId === data.nextState.activeCompanyId);
+          if (targetCompanyProject) {
+            data.nextState.activeProjectId = targetCompanyProject.id;
+          }
+          setContextState(data.nextState);
+          setMessages((prev) => [...prev, data.assistantResponse]);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("AI Chat API call error, falling back to local engine:", err);
+    }
+
+    // Fallback if API route fails or offline
+    const { assistantResponse, nextState } = processUserConversationalPrompt(
+      userPromptText,
+      contextState,
+      companies,
+      people,
+      experiences,
+      projects
+    );
+
+    const targetCompanyProject = projects.find((p) => p.companyId === nextState.activeCompanyId);
+    if (targetCompanyProject) {
+      nextState.activeProjectId = targetCompanyProject.id;
+    }
+
+    setContextState(nextState);
+    setMessages((prev) => [...prev, assistantResponse]);
   };
 
   const handleCompanyChange = (companyId: string) => {
-    setContextState((prev) => ({ ...prev, activeCompanyId: companyId }));
+    const companyProject = projects.find((p) => p.companyId === companyId);
+    setContextState((prev) => ({
+      ...prev,
+      activeCompanyId: companyId,
+      activeProjectId: companyProject ? companyProject.id : prev.activeProjectId,
+    }));
     const targetComp = companies.find((c) => c.id === companyId);
 
     const systemNotice: ChatMessage = {

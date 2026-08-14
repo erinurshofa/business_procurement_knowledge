@@ -120,7 +120,7 @@ export async function generateProcurementPackageDocx(
 
           new Paragraph({
             children: [
-              new TextRun({ text: `Nomor: 001/SP-${company.id.toUpperCase()}/VIII/2026\n`, size: 20 }),
+              new TextRun({ text: `Nomor: ${project.documentNumber || company.branding.numberingPattern}\n`, size: 20 }),
               new TextRun({ text: `Lampiran: 1 (Satu) Berkas Paket Procurement\n`, size: 20 }),
               new TextRun({ text: `Hal: Penawaran Pekerjaan ${project.projectName}\n\n`, size: 20 }),
             ],
@@ -143,7 +143,7 @@ export async function generateProcurementPackageDocx(
                 size: 20,
               }),
               new TextRun({ text: formatIDR(project.financials.grandTotalIDR), bold: true, size: 20, color: "059669" }),
-              new TextRun({ text: ` (${project.financials.terbilangIDR}) termasuk PPN 11%.\n\n`, size: 20, italics: true }),
+              new TextRun({ text: ` (${project.financials.terbilangIDR}) termasuk pajak yang berlaku.\n\n`, size: 20, italics: true }),
             ],
             spacing: { after: 300 },
           }),
@@ -163,7 +163,7 @@ export async function generateProcurementPackageDocx(
           new Paragraph({
             children: [
               new TextRun({ text: `\nSubtotal Biaya Langsung: ${formatIDR(project.financials.directCostSubtotalIDR)}\n`, bold: true, size: 20 }),
-              new TextRun({ text: `PPN 11%: ${formatIDR(project.financials.ppnAmountIDR)}\n`, size: 20 }),
+              new TextRun({ text: `PPN ${project.financials.ppnPercent || 11}%: ${formatIDR(project.financials.ppnAmountIDR)}\n`, size: 20 }),
               new TextRun({ text: `GRAND TOTAL: ${formatIDR(project.financials.grandTotalIDR)}\n`, bold: true, size: 22, color: "0891B2" }),
             ],
             spacing: { after: 400 },
@@ -172,7 +172,7 @@ export async function generateProcurementPackageDocx(
           // Signatory Block
           new Paragraph({
             children: [
-              new TextRun({ text: "Semarang, 14 Agustus 2026\n", size: 20 }),
+              new TextRun({ text: `Semarang, ${project.documentDate || "14 Agustus 2026"}\n`, size: 20 }),
               new TextRun({ text: `${company.legalName}\n\n\n\n`, bold: true, size: 20 }),
               new TextRun({ text: `${director.fullName}\n`, bold: true, size: 20, underline: {} }),
               new TextRun({ text: `${director.position}`, size: 18, color: "475569" }),

@@ -1,11 +1,12 @@
-import { ContextState, ChatMessage, Company, Person, CompanyExperience } from "@/types/procurement";
+import { ContextState, ChatMessage, Company, Person, CompanyExperience, Project } from "@/types/procurement";
 
 export function processUserConversationalPrompt(
   promptText: string,
   currentState: ContextState,
   companies: Company[],
   people: Person[],
-  experiences: CompanyExperience[]
+  experiences: CompanyExperience[],
+  projects?: Project[]
 ): {
   assistantResponse: ChatMessage;
   nextState: ContextState;
@@ -18,25 +19,38 @@ export function processUserConversationalPrompt(
   // 1. Company Switch Intent
   if (cleanPrompt.includes("alfa omega") || cleanPrompt.includes("aos")) {
     updatedState.activeCompanyId = "aos";
+    const compProj = projects?.find((p) => p.companyId === "aos");
+    if (compProj) updatedState.activeProjectId = compProj.id;
     responseText = "Perusahaan aktif berhasil diubah menjadi **CV ALFA OMEGA SOLUSINDO**.\n\nSemua master data, legalitas, pengalaman, dan bukti pajak kini dalam scope CV Alfa Omega Solusindo (Tenant Isolated).";
     suggestedActions = [
-      { label: "Buat Project Baru", actionPrompt: "Buat project baru untuk Dinas Perikanan" },
+      { label: "Pratinjau Surat Penawaran", actionPrompt: "Pratinjau Surat Penawaran" },
       { label: "Cari Pengalaman Relevan", actionPrompt: "Cari pengalaman perusahaan yang paling relevan" },
       { label: "Cek Kalender Compliance Pajak", actionPrompt: "Lihat kalender compliance" },
     ];
   } else if (cleanPrompt.includes("ezra")) {
     updatedState.activeCompanyId = "ezra";
+    const compProj = projects?.find((p) => p.companyId === "ezra");
+    if (compProj) updatedState.activeProjectId = compProj.id;
     responseText = "Perusahaan aktif berhasil diubah menjadi **PT EZRA PRATAMA**.\n\nData dan scope sistem kini menggunakan konteks PT EZRA PRATAMA.";
     suggestedActions = [
+      { label: "Pratinjau Surat Penawaran", actionPrompt: "Pratinjau Surat Penawaran" },
       { label: "Cari Pengalaman IT", actionPrompt: "Cari pengalaman PT Ezra" },
       { label: "Lihat Legalitas", actionPrompt: "Tampilkan legalitas perusahaan" },
     ];
   } else if (cleanPrompt.includes("solusi bumi") || cleanPrompt.includes("sbp")) {
     updatedState.activeCompanyId = "sbp";
+    const compProj = projects?.find((p) => p.companyId === "sbp");
+    if (compProj) updatedState.activeProjectId = compProj.id;
     responseText = "Perusahaan aktif berhasil diubah menjadi **CV SOLUSI BUMI PERSADA**.";
   } else if (cleanPrompt.includes("stigma")) {
     updatedState.activeCompanyId = "stigma";
-    responseText = "Perusahaan aktif berhasil diubah menjadi **CV STIGMA PRATAMA**.";
+    const compProj = projects?.find((p) => p.companyId === "stigma");
+    if (compProj) updatedState.activeProjectId = compProj.id;
+    responseText = "Perusahaan aktif berhasil diubah menjadi **CV STIGMA PRATAMA**.\n\nData dan scope sistem kini menggunakan konteks CV STIGMA PRATAMA.";
+    suggestedActions = [
+      { label: "Pratinjau Surat Penawaran", actionPrompt: "Pratinjau Surat Penawaran" },
+      { label: "Cek Kalender Compliance Pajak", actionPrompt: "Lihat kalender compliance" },
+    ];
   }
 
   // 2. Search / Experience Matching Intent
@@ -96,13 +110,23 @@ export function processUserConversationalPrompt(
     ];
   }
 
-  // 6. Document Generation Intent
-  else if (cleanPrompt.includes("generate") || cleanPrompt.includes("buat dokumen") || cleanPrompt.includes("paket")) {
+  // 6. Document Generation & Download Intent
+  else if (
+    cleanPrompt.includes("download") ||
+    cleanPrompt.includes("rekap") ||
+    cleanPrompt.includes("kuantitas") ||
+    cleanPrompt.includes("remunerasi") ||
+    cleanPrompt.includes("generate") ||
+    cleanPrompt.includes("buat dokumen") ||
+    cleanPrompt.includes("paket")
+  ) {
     updatedState.activeTab = "document";
-    responseText = "Memproses **Paket Dokumen Procurement Lengkap**...\n\nDokumen yang siap di-generate:\n1. 📄 **Surat Penawaran Administrative**\n2. 📘 **Dokumen Penawaran Teknis & Metodologi**\n3. 👤 **Daftar Kualifikasi Tenaga Ahli (CV)**\n4. 📊 **Rencana Anggaran Biaya (RAB & Remunerasi)**\n\n*Catatan: Semua kalkulasi finansial dijamin 100% presisi menggunakan Deterministic Calculation Engine.*";
+    responseText = "Memproses **Paket Dokumen Procurement Lengkap**...\n\nSeluruh berkas dokumen resmi (.docx) telah siap diunduh secara langsung:\n1. 📄 **0. Surat Penawaran Administrasi**\n2. 📊 **1. Rekapitulasi Penawaran Biaya**\n3. 📋 **2. Daftar Kuantitas dan Harga**\n4. 👥 **3. Komponen Remunerasi**\n\n*Silakan gunakan tombol bilah unduh di atas pratinjau dokumen atau pilih tombol aksi cepat di bawah ini.*";
     suggestedActions = [
-      { label: "Pratinjau Surat Penawaran", actionPrompt: "Lihat pratinjau surat penawaran" },
-      { label: "Pratinjau RAB Finansial", actionPrompt: "Lihat RAB lengkap" },
+      { label: "📄 Download Surat Penawaran", actionPrompt: "Download Surat Penawaran" },
+      { label: "📊 Download Rekapitulasi Biaya", actionPrompt: "Download Rekapitulasi Biaya" },
+      { label: "📋 Download Kuantitas & Harga", actionPrompt: "Download Daftar Kuantitas dan Harga" },
+      { label: "👥 Download Remunerasi", actionPrompt: "Download Komponen Remunerasi" },
     ];
   }
 

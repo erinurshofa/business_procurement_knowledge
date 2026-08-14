@@ -42,7 +42,10 @@ export const CanvasPanel: React.FC<CanvasPanelProps> = ({
   onResolveConflict,
 }) => {
   const activeCompany = companies.find((c) => c.id === contextState.activeCompanyId) || companies[0];
-  const activeProject = projects.find((p) => p.id === contextState.activeProjectId) || projects[0];
+  const activeProject =
+    projects.find((p) => p.id === contextState.activeProjectId && p.companyId === contextState.activeCompanyId) ||
+    projects.find((p) => p.companyId === contextState.activeCompanyId) ||
+    projects[0];
   const activePerson = people.find((p) => p.id === contextState.activePersonId);
 
   const unresolvedConflictCount = conflicts.filter((c) => c.status === "UNRESOLVED").length;

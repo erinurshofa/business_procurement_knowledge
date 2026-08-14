@@ -65,16 +65,21 @@ export async function getCompanyById(companyId: string): Promise<Company> {
   }
 }
 
-export async function getProjectById(projectId: string): Promise<Project> {
+export async function getProjectById(projectId: string, companyId?: string): Promise<Project> {
   try {
-    const { data: projectData, error } = await supabase
-      .from("projects")
-      .select("*")
-      .eq("id", projectId)
-      .single();
+    let query = supabase.from("projects").select("*");
+    if (projectId) {
+      query = query.eq("id", projectId);
+    } else if (companyId) {
+      query = query.eq("company_id", companyId);
+    }
+    const { data: projectData, error } = await query.maybeSingle();
 
     if (error || !projectData) {
-      return MOCK_PROJECTS.find((p) => p.id === projectId) || MOCK_PROJECTS[0];
+      return (
+        MOCK_PROJECTS.find((p) => p.id === projectId || p.companyId === companyId) ||
+        MOCK_PROJECTS[0]
+      );
     }
 
     return {
@@ -86,15 +91,23 @@ export async function getProjectById(projectId: string): Promise<Project> {
       location: projectData.location || "",
       procurementCategory: projectData.procurement_category || "Konsultansi IT",
       scopeOfWork: projectData.scope_of_work || "",
-      targetStartDate: projectData.target_start_date || "2026-09-01",
-      targetEndDate: projectData.target_end_date || "2026-12-31",
+      targetStartDate: projectData.target_start_date || "2026-08-13",
+      targetEndDate: projectData.target_end_date || "2026-11-11",
+      documentNumber: projectData.document_number,
+      documentDate: projectData.document_date,
+      procurementRefNo: projectData.procurement_ref_no,
+      executionDays: projectData.execution_days,
+      validityDays: projectData.validity_days,
       assignments: [],
       selectedExperienceIds: [],
       financials: projectData.financials || MOCK_PROJECTS[0].financials,
-      status: projectData.status || "Draft",
+      status: projectData.status || "Approved",
     };
   } catch (err) {
-    return MOCK_PROJECTS.find((p) => p.id === projectId) || MOCK_PROJECTS[0];
+    return (
+      MOCK_PROJECTS.find((p) => p.id === projectId || p.companyId === companyId) ||
+      MOCK_PROJECTS[0]
+    );
   }
 }
 
@@ -108,7 +121,7 @@ export async function logGeneratedDocument(
   try {
     await supabase.from("generated_documents").insert({
       company_id: companyId,
-      project_id: projectId !== "proj-1" ? projectId : null,
+      project_id: projectId || null,
       document_type: documentType,
       document_number: documentNumber,
       document_date: new Date().toISOString().split("T")[0],

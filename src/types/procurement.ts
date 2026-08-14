@@ -208,6 +208,11 @@ export interface Project {
   scopeOfWork: string;
   targetStartDate: string;
   targetEndDate: string;
+  documentNumber?: string;
+  documentDate?: string;
+  procurementRefNo?: string;
+  executionDays?: number;
+  validityDays?: number;
   assignments: ProjectAssignment[];
   selectedExperienceIds: string[];
   financials: FinancialCalculation;
