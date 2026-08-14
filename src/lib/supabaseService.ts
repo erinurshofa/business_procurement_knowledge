@@ -131,3 +131,35 @@ export async function logGeneratedDocument(
     console.error("[Supabase] Failed to log generated document:", err);
   }
 }
+
+export async function updateProjectDetails(
+  projectId: string,
+  updatedFields: Partial<Project>
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("projects")
+      .update({
+        project_name: updatedFields.projectName,
+        client_name: updatedFields.clientName,
+        client_address: updatedFields.clientAddress,
+        scope_of_work: updatedFields.scopeOfWork,
+        document_number: updatedFields.documentNumber,
+        document_date: updatedFields.documentDate,
+        procurement_ref_no: updatedFields.procurementRefNo,
+        execution_days: updatedFields.executionDays,
+        validity_days: updatedFields.validityDays,
+        financials: updatedFields.financials,
+      })
+      .eq("id", projectId);
+
+    if (error) {
+      console.warn("[Supabase] Update project failed, falling back to local state:", error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[Supabase] Failed to update project in database:", err);
+    return false;
+  }
+}

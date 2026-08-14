@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Company, Project, Person, FinancialItem } from "@/types/procurement";
 import { formatIDR } from "@/lib/financialEngine";
+import { updateProjectDetails } from "@/lib/supabaseService";
 import {
   FileText,
   CheckCircle2,
@@ -14,33 +15,66 @@ import {
   RotateCcw,
   Plus,
   Trash2,
+  Building2,
+  DollarSign,
+  Calculator,
+  UserCheck,
 } from "lucide-react";
 
 interface DocumentViewerProps {
   company: Company;
   project: Project;
   selectedPerson?: Person;
+  onProjectUpdate?: (updatedProject: Project) => void;
 }
 
 export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   company,
   project,
   selectedPerson,
+  onProjectUpdate,
 }) => {
   const [selectedSubTab, setSelectedSubTab] = useState<"surat" | "teknis" | "cv" | "rab">("surat");
   const [isEditMode, setIsEditMode] = useState(false);
   const [editableProject, setEditableProject] = useState<Project>(project);
   const [activeProvenance, setActiveProvenance] = useState<string | null>(null);
   const [saveNotification, setSaveNotification] = useState<string | null>(null);
-
+  const [isSaving, setIsSaving] = useState(false);
   const [isStampOverlayActive, setIsStampOverlayActive] = useState(true);
 
-  // Edit Mode Toggle Button
   const director = company.directors.find((d) => d.isSignatory) || company.directors[0];
 
   useEffect(() => {
     setEditableProject(project);
   }, [project]);
+
+  // Recalculate RAB totals helper
+  const recalculateFinancials = (items: FinancialItem[], customPpnPercent?: number) => {
+    const ppnPercent = customPpnPercent !== undefined ? customPpnPercent : (editableProject.financials.ppnPercent || 11);
+
+    const personnelCostSubtotalIDR = items
+      .filter((i) => i.category === "Personnel")
+      .reduce((sum, i) => sum + (Number(i.subtotalIDR) || 0), 0);
+
+    const nonPersonnelCostSubtotalIDR = items
+      .filter((i) => i.category === "Non-Personnel")
+      .reduce((sum, i) => sum + (Number(i.subtotalIDR) || 0), 0);
+
+    const directCostSubtotalIDR = personnelCostSubtotalIDR + nonPersonnelCostSubtotalIDR;
+    const ppnAmountIDR = Math.round((directCostSubtotalIDR * ppnPercent) / 100);
+    const grandTotalIDR = directCostSubtotalIDR + ppnAmountIDR;
+
+    return {
+      items,
+      personnelCostSubtotalIDR,
+      nonPersonnelCostSubtotalIDR,
+      directCostSubtotalIDR,
+      ppnPercent,
+      ppnAmountIDR,
+      grandTotalIDR,
+      terbilangIDR: editableProject.financials.terbilangIDR,
+    };
+  };
 
   const handleFieldChange = (field: keyof Project, value: any) => {
     setEditableProject((prev) => ({
@@ -49,7 +83,14 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     }));
   };
 
-  const handleFinancialItemChange = (itemId: string, field: string, value: any) => {
+  const handlePpnChange = (newPpnPercent: number) => {
+    setEditableProject((prev) => ({
+      ...prev,
+      financials: recalculateFinancials(prev.financials.items, newPpnPercent),
+    }));
+  };
+
+  const handleFinancialItemChange = (itemId: string, field: keyof FinancialItem, value: any) => {
     setEditableProject((prev) => {
       const updatedItems = prev.financials.items.map((item) => {
         if (item.id !== itemId) return item;
@@ -63,67 +104,29 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
         return updated;
       });
 
-      const personnelCostSubtotalIDR = updatedItems
-        .filter((i) => i.category === "Personnel")
-        .reduce((sum, i) => sum + i.subtotalIDR, 0);
-
-      const nonPersonnelCostSubtotalIDR = updatedItems
-        .filter((i) => i.category === "Non-Personnel")
-        .reduce((sum, i) => sum + i.subtotalIDR, 0);
-
-      const directCostSubtotalIDR = personnelCostSubtotalIDR + nonPersonnelCostSubtotalIDR;
-      const ppnAmountIDR = Math.round(directCostSubtotalIDR * 0.11);
-      const grandTotalIDR = directCostSubtotalIDR + ppnAmountIDR;
-
       return {
         ...prev,
-        financials: {
-          ...prev.financials,
-          items: updatedItems,
-          personnelCostSubtotalIDR,
-          nonPersonnelCostSubtotalIDR,
-          directCostSubtotalIDR,
-          ppnAmountIDR,
-          grandTotalIDR,
-        },
+        financials: recalculateFinancials(updatedItems),
       };
     });
   };
 
-  const handleAddFinancialItem = () => {
+  const handleAddFinancialItem = (category: "Personnel" | "Non-Personnel" = "Personnel") => {
     const newItem: FinancialItem = {
       id: `fin-custom-${Date.now()}`,
-      category: "Personnel",
-      description: "Komponen Pekerjaan Baru",
+      category,
+      description: category === "Personnel" ? "Tenaga Ahli Tambahan" : "Peralatan & Operational Support",
       quantity: 1,
-      unit: "OB",
+      unit: category === "Personnel" ? "OB" : "Paket",
       durationMonths: 1,
       billingRateIDR: 10000000,
       subtotalIDR: 10000000,
     };
     setEditableProject((prev) => {
       const updatedItems = [...prev.financials.items, newItem];
-      const personnelCostSubtotalIDR = updatedItems
-        .filter((i) => i.category === "Personnel")
-        .reduce((sum, i) => sum + i.subtotalIDR, 0);
-      const nonPersonnelCostSubtotalIDR = updatedItems
-        .filter((i) => i.category === "Non-Personnel")
-        .reduce((sum, i) => sum + i.subtotalIDR, 0);
-      const directCostSubtotalIDR = personnelCostSubtotalIDR + nonPersonnelCostSubtotalIDR;
-      const ppnAmountIDR = Math.round(directCostSubtotalIDR * 0.11);
-      const grandTotalIDR = directCostSubtotalIDR + ppnAmountIDR;
-
       return {
         ...prev,
-        financials: {
-          ...prev.financials,
-          items: updatedItems,
-          personnelCostSubtotalIDR,
-          nonPersonnelCostSubtotalIDR,
-          directCostSubtotalIDR,
-          ppnAmountIDR,
-          grandTotalIDR,
-        },
+        financials: recalculateFinancials(updatedItems),
       };
     });
   };
@@ -131,34 +134,28 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   const handleDeleteFinancialItem = (id: string) => {
     setEditableProject((prev) => {
       const updatedItems = prev.financials.items.filter((i) => i.id !== id);
-      const personnelCostSubtotalIDR = updatedItems
-        .filter((i) => i.category === "Personnel")
-        .reduce((sum, i) => sum + i.subtotalIDR, 0);
-      const nonPersonnelCostSubtotalIDR = updatedItems
-        .filter((i) => i.category === "Non-Personnel")
-        .reduce((sum, i) => sum + i.subtotalIDR, 0);
-      const directCostSubtotalIDR = personnelCostSubtotalIDR + nonPersonnelCostSubtotalIDR;
-      const ppnAmountIDR = Math.round(directCostSubtotalIDR * 0.11);
-      const grandTotalIDR = directCostSubtotalIDR + ppnAmountIDR;
-
       return {
         ...prev,
-        financials: {
-          ...prev.financials,
-          items: updatedItems,
-          personnelCostSubtotalIDR,
-          nonPersonnelCostSubtotalIDR,
-          directCostSubtotalIDR,
-          ppnAmountIDR,
-          grandTotalIDR,
-        },
+        financials: recalculateFinancials(updatedItems),
       };
     });
   };
 
-  const handleSave = () => {
-    setSaveNotification("Perubahan dokumen berhasil disimpan!");
-    setTimeout(() => setSaveNotification(null), 3000);
+  const handleSaveAll = async () => {
+    setIsSaving(true);
+    const success = await updateProjectDetails(editableProject.id, editableProject);
+    setIsSaving(false);
+
+    if (onProjectUpdate) {
+      onProjectUpdate(editableProject);
+    }
+
+    setSaveNotification(
+      success
+        ? "Semua perubahan dokumen & RAB berhasil disimpan permanen ke database Supabase!"
+        : "Perubahan disimpan ke sesi aktif lokal."
+    );
+    setTimeout(() => setSaveNotification(null), 3500);
   };
 
   const handleReset = () => {
@@ -210,7 +207,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                 : "text-slate-400 border-transparent hover:text-slate-200"
             }`}
           >
-            4. RAB Finansial
+            4. RAB & Remunerasi
           </button>
         </div>
 
@@ -233,7 +230,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
             ) : (
               <>
                 <Edit3 className="h-3.5 w-3.5 text-cyan-400" />
-                <span>Edit Dokumen</span>
+                <span>Edit Dokumen Universal</span>
               </>
             )}
           </button>
@@ -317,7 +314,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
         </div>
       </div>
 
-      {/* Notifications & Provenance Bar */}
+      {/* Notifications Bar */}
       {saveNotification && (
         <div className="bg-emerald-950/90 border-b border-emerald-800 p-2 px-4 flex items-center justify-between text-xs text-emerald-300 animate-fadeIn">
           <div className="flex items-center space-x-2">
@@ -339,7 +336,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                 }`}
               />
               <span className="font-bold text-xs uppercase tracking-wide text-slate-200">
-                {isEditMode ? "✏️ Mode Edit Dokumen Aktif" : "👁️ Mode Pratinjau Dokumen Presisi"}
+                {isEditMode ? "✏️ Mode Edit Dokumen Universal Aktif" : "👁️ Mode Pratinjau Dokumen Presisi"}
               </span>
             </div>
             {isEditMode && (
@@ -352,11 +349,12 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                   <span>Reset</span>
                 </button>
                 <button
-                  onClick={handleSave}
-                  className="flex items-center space-x-1 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold px-3 py-1 rounded text-xs shadow-md transition-all"
+                  onClick={handleSaveAll}
+                  disabled={isSaving}
+                  className="flex items-center space-x-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold px-3.5 py-1 rounded text-xs shadow-md transition-all disabled:opacity-50"
                 >
-                  <Save className="h-3 w-3" />
-                  <span>Simpan</span>
+                  <Save className="h-3.5 w-3.5" />
+                  <span>{isSaving ? "Menyimpan..." : "Simpan Perubahan Dokumen"}</span>
                 </button>
               </div>
             )}
@@ -381,7 +379,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                     type="text"
                     value={editableProject.documentNumber || ""}
                     onChange={(e) => handleFieldChange("documentNumber", e.target.value)}
-                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs font-mono text-cyan-400 w-48 focus:outline-none focus:border-cyan-500"
+                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs font-mono text-cyan-400 w-52 focus:outline-none focus:border-cyan-500"
                   />
                 </div>
               ) : (
@@ -397,12 +395,24 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
           {/* ---------------------------------------------------- */}
           {selectedSubTab === "surat" && (
             <div className="space-y-4 font-sans text-slate-200 leading-relaxed text-xs">
-              {isEditMode ? (
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
-                  <h4 className="font-bold text-amber-400 text-xs">Form Edit Surat Penawaran:</h4>
+              {isEditMode && (
+                <div className="bg-slate-950 p-4 rounded-xl border border-amber-500/40 space-y-3">
+                  <h4 className="font-bold text-amber-400 text-xs flex items-center space-x-1">
+                    <Edit3 className="h-3.5 w-3.5" />
+                    <span>Form Edit Informasi Surat Penawaran:</span>
+                  </h4>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[10px] text-slate-400 block mb-1">Tanggal Surat:</label>
+                      <label className="text-[10px] text-slate-400 block mb-1">Nama Pekerjaan (Proyek):</label>
+                      <input
+                        type="text"
+                        value={editableProject.projectName}
+                        onChange={(e) => handleFieldChange("projectName", e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-100 font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Tanggal Surat Penawaran:</label>
                       <input
                         type="text"
                         value={editableProject.documentDate || ""}
@@ -420,7 +430,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-slate-400 block mb-1">Penerima (Client):</label>
+                      <label className="text-[10px] text-slate-400 block mb-1">Penerima Surat (Instansi Client):</label>
                       <input
                         type="text"
                         value={editableProject.clientName || ""}
@@ -429,7 +439,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-slate-400 block mb-1">Hari Pelaksanaan:</label>
+                      <label className="text-[10px] text-slate-400 block mb-1">Jangka Waktu Pelaksanaan (Hari):</label>
                       <input
                         type="number"
                         value={editableProject.executionDays || 90}
@@ -437,9 +447,18 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                         className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-100"
                       />
                     </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Masa Berlaku Penawaran (Hari):</label>
+                      <input
+                        type="number"
+                        value={editableProject.validityDays || 30}
+                        onChange={(e) => handleFieldChange("validityDays", Number(e.target.value))}
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-100"
+                      />
+                    </div>
                   </div>
                 </div>
-              ) : null}
+              )}
 
               {/* Preview Sheet Surat Penawaran */}
               <div className="flex justify-between items-start text-slate-300">
@@ -544,29 +563,32 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                 DOKUMEN PENAWARAN TEKNIS & METODOLOGI
               </h3>
 
-              {isEditMode ? (
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
-                  <h4 className="font-bold text-amber-400 text-xs">Form Edit Teknis:</h4>
+              {isEditMode && (
+                <div className="bg-slate-950 p-4 rounded-xl border border-amber-500/40 space-y-3">
+                  <h4 className="font-bold text-amber-400 text-xs flex items-center space-x-1">
+                    <Edit3 className="h-3.5 w-3.5" />
+                    <span>Form Edit Penawaran Teknis & Ruang Lingkup Pekerjaan:</span>
+                  </h4>
                   <div>
                     <label className="text-[10px] text-slate-400 block mb-1">Nama Pekerjaan:</label>
                     <input
                       type="text"
                       value={editableProject.projectName}
                       onChange={(e) => handleFieldChange("projectName", e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-100"
+                      className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-100 font-semibold"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-400 block mb-1">Ruang Lingkup Pekerjaan:</label>
+                    <label className="text-[10px] text-slate-400 block mb-1">Ruang Lingkup & Deskripsi Teknis Pekerjaan:</label>
                     <textarea
                       rows={3}
                       value={editableProject.scopeOfWork}
                       onChange={(e) => handleFieldChange("scopeOfWork", e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-100"
+                      className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-100 leading-relaxed"
                     />
                   </div>
                 </div>
-              ) : null}
+              )}
 
               <p><strong>Nama Proyek:</strong> {editableProject.projectName}</p>
               <p><strong>Ruang Lingkup Pekerjaan:</strong> {editableProject.scopeOfWork}</p>
@@ -583,13 +605,43 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
           )}
 
           {/* ---------------------------------------------------- */}
-          {/* SubTab 3: CV Tenaga Ahli                             */}
+          {/* SubTab 3: CV & Komponen Remunerasi Tenaga Ahli       */}
           {/* ---------------------------------------------------- */}
           {selectedSubTab === "cv" && (
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-slate-100 border-b border-slate-800 pb-2">
-                DAFTAR RIWAYAT HIDUP (CV) TENAGA AHLI
+                DAFTAR RIWAYAT HIDUP (CV) & RINCIAN KOMPONEN REMUNERASI TENAGA AHLI
               </h3>
+
+              {isEditMode && selectedPerson && (
+                <div className="bg-slate-950 p-4 rounded-xl border border-amber-500/40 space-y-3">
+                  <h4 className="font-bold text-amber-400 text-xs flex items-center space-x-1">
+                    <Edit3 className="h-3.5 w-3.5" />
+                    <span>Form Edit Komponen Remunerasi Personel:</span>
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Nama Tenaga Ahli:</label>
+                      <input
+                        type="text"
+                        value={selectedPerson.fullName}
+                        readOnly
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-400 cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Posisi Penugasan:</label>
+                      <input
+                        type="text"
+                        value="Team Leader / Software Architect"
+                        readOnly
+                        className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-cyan-300 font-semibold"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {selectedPerson ? (
                 <div className="space-y-3">
                   <div className="flex justify-between items-start bg-slate-950 p-4 rounded-lg border border-slate-800">
@@ -604,7 +656,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                     </div>
                     <span className="flex items-center space-x-1 text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded text-[10px]">
                       <CheckCircle2 className="h-3 w-3" />
-                      <span>Verified CV</span>
+                      <span>Verified CV & Remunerasi</span>
                     </span>
                   </div>
                   <p><strong>Pengalaman Kerja Total:</strong> {selectedPerson.totalYearsExperience} Tahun</p>
@@ -624,26 +676,66 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
           )}
 
           {/* ---------------------------------------------------- */}
-          {/* SubTab 4: RAB Finansial & Interactive Editor         */}
+          {/* SubTab 4: RAB Finansial, Rekapitulasi & Kuantitas    */}
           {/* ---------------------------------------------------- */}
           {selectedSubTab === "rab" && (
             <div className="space-y-4">
               <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                <h3 className="text-sm font-bold text-slate-100">
-                  RENCANA ANGGARAN BIAYA (RAB) & REMUNERASI
+                <h3 className="text-sm font-bold text-slate-100 flex items-center space-x-2">
+                  <Calculator className="h-4 w-4 text-cyan-400" />
+                  <span>RENCANA ANGGARAN BIAYA (RAB), REKAPITULASI BIAYA & DAFTAR KUANTITAS HARGA</span>
                 </h3>
                 <span className="text-[10px] text-cyan-400 font-semibold bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800">
-                  Deterministic Engine Standard
+                  Deterministic Calculation Engine
                 </span>
               </div>
 
-              {/* RAB Table (Editable or Viewable) */}
+              {/* Tax Rate & PPN Selector in Edit Mode */}
+              {isEditMode && (
+                <div className="bg-slate-950 p-4 rounded-xl border border-amber-500/40 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-amber-400 text-xs flex items-center space-x-1">
+                      <DollarSign className="h-3.5 w-3.5" />
+                      <span>Pengaturan Tarif Pajak PPN & Terbilang:</span>
+                    </h4>
+                    <div className="flex items-center space-x-2">
+                      <label className="text-[11px] text-slate-300 font-semibold">Tarif PPN:</label>
+                      <select
+                        value={editableProject.financials.ppnPercent || 11}
+                        onChange={(e) => handlePpnChange(Number(e.target.value))}
+                        className="bg-slate-900 text-cyan-400 border border-slate-700 rounded px-2 py-1 text-xs font-bold focus:outline-none"
+                      >
+                        <option value={11}>11% (PPN Standard)</option>
+                        <option value={12}>12% (PPN Terbaru UU HPP)</option>
+                        <option value={0}>0% (Bebas PPN / Non-BKP)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Kalimat Terbilang Rupiah:</label>
+                    <input
+                      type="text"
+                      value={editableProject.financials.terbilangIDR}
+                      onChange={(e) =>
+                        setEditableProject((prev) => ({
+                          ...prev,
+                          financials: { ...prev.financials, terbilangIDR: e.target.value },
+                        }))
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-100 italic"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* RAB & Kuantitas Table (Editable or Viewable) */}
               <div className="overflow-x-auto border border-slate-800 rounded-lg">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 text-[11px]">
                       <th className="p-2.5">No</th>
-                      <th className="p-2.5">Uraian Komponen</th>
+                      <th className="p-2.5">Kategori</th>
+                      <th className="p-2.5">Uraian Komponen Pekerjaan</th>
                       <th className="p-2.5">Vol</th>
                       <th className="p-2.5">Satuan</th>
                       <th className="p-2.5">Harga Satuan (IDR)</th>
@@ -655,6 +747,30 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                     {editableProject.financials.items.map((item, idx) => (
                       <tr key={item.id} className="hover:bg-slate-800/40">
                         <td className="p-2.5">{idx + 1}</td>
+                        <td className="p-2.5">
+                          {isEditMode ? (
+                            <select
+                              value={item.category}
+                              onChange={(e) =>
+                                handleFinancialItemChange(item.id, "category", e.target.value as any)
+                              }
+                              className="bg-slate-950 text-xs text-slate-200 border border-slate-700 rounded px-1 py-0.5"
+                            >
+                              <option value="Personnel">Personnel</option>
+                              <option value="Non-Personnel">Non-Personnel</option>
+                            </select>
+                          ) : (
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                item.category === "Personnel"
+                                  ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/30"
+                                  : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                              }`}
+                            >
+                              {item.category}
+                            </span>
+                          )}
+                        </td>
                         <td className="p-2.5 font-medium">
                           {isEditMode ? (
                             <input
@@ -696,8 +812,10 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                             <input
                               type="number"
                               value={item.billingRateIDR}
-                              onChange={(e) => handleFinancialItemChange(item.id, "billingRateIDR", Number(e.target.value))}
-                              className="w-28 bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-cyan-300 font-mono"
+                              onChange={(e) =>
+                                handleFinancialItemChange(item.id, "billingRateIDR", Number(e.target.value))
+                              }
+                              className="w-28 bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-cyan-300 font-mono font-bold"
                             />
                           ) : (
                             formatIDR(item.billingRateIDR)
@@ -710,7 +828,8 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                           <td className="p-2.5 text-center">
                             <button
                               onClick={() => handleDeleteFinancialItem(item.id)}
-                              className="p-1 text-rose-400 hover:bg-rose-500/20 rounded"
+                              className="p-1 text-rose-400 hover:bg-rose-500/20 rounded transition-all"
+                              title="Hapus Baris Komponen"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -723,13 +842,22 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
               </div>
 
               {isEditMode && (
-                <button
-                  onClick={handleAddFinancialItem}
-                  className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Tambah Komponen RAB</span>
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleAddFinancialItem("Personnel")}
+                    className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Tambah Komponen Personel</span>
+                  </button>
+                  <button
+                    onClick={() => handleAddFinancialItem("Non-Personnel")}
+                    className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Tambah Komponen Non-Personel</span>
+                  </button>
+                </div>
               )}
 
               {/* Summary Totals */}
