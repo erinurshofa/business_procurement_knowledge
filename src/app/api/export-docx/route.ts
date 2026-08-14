@@ -5,26 +5,58 @@ import { generateProcurementPackageDocx } from "@/lib/docxGenerator";
 import { getCompanyById, getProjectById, logGeneratedDocument } from "@/lib/supabaseService";
 import { MOCK_PEOPLE } from "@/lib/mockData";
 
-function findDocxFile(companyId: string, docPrefix: string = "0"): string | null {
-  const dirPath = path.join(process.cwd(), "public", "documents", "docx");
-  if (!fs.existsSync(dirPath)) return null;
+interface FoundDoc {
+  fileName: string;
+  fullPath: string;
+}
 
-  const files = fs.readdirSync(dirPath);
-  const matched = files.find((file) => {
-    if (!file.endsWith(".docx")) return false;
-    const lower = file.toLowerCase();
+function getAllFilesRecursively(dir: string): string[] {
+  let results: string[] = [];
+  if (!fs.existsSync(dir)) return results;
+  const list = fs.readdirSync(dir);
+  list.forEach((file) => {
+    const filePath = path.join(dir, file);
+    const stat = fs.statSync(filePath);
+    if (stat && stat.isDirectory()) {
+      results = results.concat(getAllFilesRecursively(filePath));
+    } else {
+      results.push(filePath);
+    }
+  });
+  return results;
+}
 
-    const startsWithPrefix = file.startsWith(docPrefix);
+function findDocxFile(companyId: string, docPrefix: string = "0", customKeyword?: string): FoundDoc | null {
+  const baseDir = path.join(process.cwd(), "public", "documents", "docx");
+  const allFiles = getAllFilesRecursively(baseDir);
 
-    if (companyId === "aos" && lower.includes("alfa omega")) return startsWithPrefix;
-    if (companyId === "ezra" && lower.includes("ezra")) return startsWithPrefix;
-    if (companyId === "stigma" && lower.includes("stigma")) return startsWithPrefix;
-    if (companyId === "sbp" && (lower.includes("solusi bumi") || lower.includes("sbp"))) return startsWithPrefix;
+  const matchedPath = allFiles.find((filePath) => {
+    const fileName = path.basename(filePath);
+    const lower = fileName.toLowerCase();
 
-    return false;
+    // Check company match
+    let companyMatch = false;
+    if (companyId === "aos" && lower.includes("alfa omega")) companyMatch = true;
+    if (companyId === "ezra" && lower.includes("ezra")) companyMatch = true;
+    if (companyId === "stigma" && lower.includes("stigma")) companyMatch = true;
+    if (companyId === "sbp" && (lower.includes("solusi bumi") || lower.includes("sbp"))) companyMatch = true;
+
+    if (!companyMatch) return false;
+
+    // Check custom keyword or prefix
+    if (customKeyword && lower.includes(customKeyword.toLowerCase())) {
+      return true;
+    }
+
+    return fileName.startsWith(docPrefix);
   });
 
-  return matched || null;
+  if (!matchedPath) return null;
+
+  return {
+    fileName: path.basename(matchedPath),
+    fullPath: matchedPath,
+  };
 }
 
 export async function GET(req: NextRequest) {
@@ -33,24 +65,20 @@ export async function GET(req: NextRequest) {
     const companyId = searchParams.get("companyId") || "aos";
     const projectId = searchParams.get("projectId") || "";
     const docPrefix = searchParams.get("docPrefix") || "0";
+    const keyword = searchParams.get("keyword") || undefined;
 
     // 1. Fetch live data from Supabase (or fallback to local dataset)
     const company = await getCompanyById(companyId);
     const project = await getProjectById(projectId, companyId);
     const person = MOCK_PEOPLE[0];
 
-    const realFileName = findDocxFile(companyId, docPrefix);
+    const found = findDocxFile(companyId, docPrefix, keyword);
     let docxBuffer: Buffer;
-    let fileName = realFileName || `Surat_Penawaran_${company.legalName.replace(/[^a-zA-Z0-9]/g, "_")}.docx`;
+    let fileName = found?.fileName || `Surat_Penawaran_${company.legalName.replace(/[^a-zA-Z0-9]/g, "_")}.docx`;
 
-    // 2. Serve actual pre-existing official DOCX from public/documents/docx/ if present
-    if (realFileName) {
-      const filePath = path.join(process.cwd(), "public", "documents", "docx", realFileName);
-      if (fs.existsSync(filePath)) {
-        docxBuffer = await fs.promises.readFile(filePath);
-      } else {
-        docxBuffer = await generateProcurementPackageDocx(company, project, person);
-      }
+    // 2. Serve actual pre-existing official file if found
+    if (found && fs.existsSync(found.fullPath)) {
+      docxBuffer = await fs.promises.readFile(found.fullPath);
     } else {
       docxBuffer = await generateProcurementPackageDocx(company, project, person);
     }
