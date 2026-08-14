@@ -76,27 +76,74 @@ export function processUserConversationalPrompt(
     }
   }
 
-  // 3. Personnel Assignment Intent
-  else if (cleanPrompt.includes("agus") || cleanPrompt.includes("team leader")) {
-    const agus = people.find((p) => p.fullName.includes("Agus"));
-    if (agus) {
-      updatedState.activePersonId = agus.id;
-      updatedState.activeTab = "knowledge";
-      responseText = `**Agus Setiawan, S.Kom., M.T.** telah dipilih sebagai **Team Leader / Software Architect**.\n\nKualifikasi:\n• Pengalaman: 12 Tahun\n• Sertifikasi: \`Certified Software Architect (BNSP)\`\n• Status Evidence CV: Verified (\`CV_Agus_Setiawan_2026.pdf\`)`;
-      suggestedActions = [
-        { label: "Hitung RAB Personel", actionPrompt: "Hitung biaya remunerasi Agus" },
-        { label: "Generate Dokumen CV", actionPrompt: "Generate CV Agus Setiawan" },
-      ];
+  // 3. Personnel Assignment & Recommendation Intent
+  else if (
+    cleanPrompt.includes("personil") ||
+    cleanPrompt.includes("tenaga ahli") ||
+    cleanPrompt.includes("affandy") ||
+    cleanPrompt.includes("eri") ||
+    cleanPrompt.includes("dyan") ||
+    cleanPrompt.includes("agus") ||
+    cleanPrompt.includes("team leader") ||
+    cleanPrompt.includes("rekomendasi")
+  ) {
+    updatedState.activeTab = "knowledge";
+    const companyPeople = people.filter((p) => p.currentPrimaryCompanyId === updatedState.activeCompanyId);
+
+    if (cleanPrompt.includes("affandy") || (updatedState.activeCompanyId === "stigma" && cleanPrompt.includes("team leader"))) {
+      const affandy = people.find((p) => p.fullName.includes("Affandy"));
+      if (affandy) {
+        updatedState.activePersonId = affandy.id;
+        responseText = `**Affandy Ichsan, S.Kom.** direkomendasikan sebagai **Team Leader / Ahli Kecerdasan Buatan** untuk ${companies.find(c => c.id === updatedState.activeCompanyId)?.legalName}.\n\nKualifikasi:\n• Pengalaman: 12 Tahun di Bidang AI, IoT Vision & Monitoring\n• Sertifikasi: \`Certified AI Computer Vision & IoT Specialist\`\n• Surat Penugasan: \`No: 1 / ST / IOTMOTION / IV / 2026\`\n• Billing Rate: Rp 8.875.000 / OB (Total 4 Bulan: Rp 35.500.000)`;
+        suggestedActions = [
+          { label: "Tugaskan ke Proyek", actionPrompt: "Tugaskan Affandy ke proyek aktif" },
+          { label: "Lihat Surat Penugasan", actionPrompt: "Lihat Surat Penugasan Personil" },
+        ];
+      }
+    } else if (cleanPrompt.includes("eri") || (updatedState.activeCompanyId === "stigma" && cleanPrompt.includes("programmer"))) {
+      const eri = people.find((p) => p.fullName.includes("Eri"));
+      if (eri) {
+        updatedState.activePersonId = eri.id;
+        responseText = `**Eri Nur Sofa, S.Kom.** direkomendasikan sebagai **Tenaga Ahli Sistem Keamanan / Programmer (Quality Engineer)**.\n\nKualifikasi:\n• Pendidikan: S1 Teknik Informatika Universitas Semarang (Lulus 2019)\n• Pengalaman Nyata: Programmer Aplikasi SIDAKSOS (Dinsos Semarang) & Staf Ahli Sistem Informasi (DPM-PTSP Semarang)\n• Surat Penugasan: \`No: 2 / ST / IOTMOTION / IV / 2026\`\n• Billing Rate: Rp 8.875.000 / OB (Total 4 Bulan: Rp 35.500.000)`;
+        suggestedActions = [
+          { label: "Tugaskan ke Proyek", actionPrompt: "Tugaskan Eri ke proyek aktif" },
+          { label: "Lihat CV Eri Nur Sofa", actionPrompt: "Pratinjau CV Tenaga Ahli" },
+        ];
+      }
+    } else if (cleanPrompt.includes("dyan") || (updatedState.activeCompanyId === "stigma" && cleanPrompt.includes("admin"))) {
+      const dyan = people.find((p) => p.fullName.includes("Dyan"));
+      if (dyan) {
+        updatedState.activePersonId = dyan.id;
+        responseText = `**Dyan Sinung Prabowo, S.Kom** direkomendasikan sebagai **Tenaga Pendukung Operator Komputer / Administrasi Proyek**.\n\nKualifikasi:\n• Pendidikan: SMK Negeri 1 Rembang\n• Pengalaman Nyata: Operator Komputer Pelayanan Perizinan (DPM-PTSP Kota Semarang)\n• Billing Rate: Rp 3.700.000 / Bulan`;
+        suggestedActions = [
+          { label: "Tugaskan ke Proyek", actionPrompt: "Tugaskan Dyan ke proyek aktif" },
+          { label: "Lihat CV Dyan", actionPrompt: "Pratinjau CV Tenaga Ahli" },
+        ];
+      }
+    } else {
+      const agus = people.find((p) => p.fullName.includes("Agus"));
+      if (agus) {
+        updatedState.activePersonId = agus.id;
+        responseText = `**Agus Setiawan, S.Kom., M.T.** telah dipilih sebagai **Team Leader / Software Architect**.\n\nKualifikasi:\n• Pengalaman: 12 Tahun\n• Sertifikasi: \`Certified Software Architect (BNSP)\`\n• Status Evidence CV: Verified (\`CV_Agus_Setiawan_2026.pdf\`)`;
+        suggestedActions = [
+          { label: "Hitung RAB Personel", actionPrompt: "Hitung biaya remunerasi Agus" },
+          { label: "Generate Dokumen CV", actionPrompt: "Generate CV Agus Setiawan" },
+        ];
+      }
     }
   }
 
   // 4. Compliance / Tax Calendar Intent
   else if (cleanPrompt.includes("compliance") || cleanPrompt.includes("bpe") || cleanPrompt.includes("pajak") || cleanPrompt.includes("kalender")) {
     updatedState.activeTab = "compliance";
-    responseText = "Menampilkan **Compliance Calendar & Evidence Vault**.\n\nSistem mencatat:\n• **BPE Pajak Bulanan 2026:** 7 Bulan Verified (Jan-Juli), 1 Bulan DUE (Agustus).\n• **Surat Keterangan Bank:** Target Tahunan Januari - Status: **VERIFIED** (\`Bank Jateng 2026\`).\n• **SPT Tahunan Badan:** Target Tahunan April - Status: **VERIFIED** (\`SPT 2025\`).";
+    if (updatedState.activeCompanyId === "stigma") {
+      responseText = "Menampilkan **Compliance Calendar & Evidence Vault CV STIGMA PRATAMA**.\n\nSistem mencatat data faktual resmi:\n• **BPE Pajak Bulanan 2026:** \n  - BPE Masa Januari 2026 (Verified: `4.a BPE Januari 2026 - CV STIGMA PRATAMA.jpg`)\n  - BPE Masa Februari 2026 (Verified: `4.b BPE Februari 2026 - CV STIGMA PRATAMA.jpg`)\n  - BPE Masa Maret 2026 (Verified: `4.c BPE Maret 2026 - CV STIGMA PRATAMA.jpg`)\n• **Laporan SPT Tahunan Badan 1771:** Verified (No Tanda Terima: `60052406557252030151` / Tahun Pajak 2024).\n• **Pakta Integritas & Prakualifikasi:** Verified (`0. Pakta Integritas` & `1. Surat Pernyataan Prakualifikasi`).";
+    } else {
+      responseText = "Menampilkan **Compliance Calendar & Evidence Vault**.\n\nSistem mencatat:\n• **BPE Pajak Bulanan 2026:** 7 Bulan Verified (Jan-Juli), 1 Bulan DUE (Agustus).\n• **Surat Keterangan Bank:** Target Tahunan Januari - Status: **VERIFIED** (\`Bank Jateng 2026\`).\n• **SPT Tahunan Badan:** Target Tahunan April - Status: **VERIFIED** (\`SPT 2025\`).";
+    }
     suggestedActions = [
-      { label: "Cek Status BPE Agustus", actionPrompt: "Detail BPE Agustus 2026" },
-      { label: "Cek Audit Konflik", actionPrompt: "Cek konflik data" },
+      { label: "Cek Status BPE", actionPrompt: "Detail BPE 2026" },
+      { label: "Cek Audit Kepatuhan", actionPrompt: "Cek konflik data" },
     ];
   }
 
