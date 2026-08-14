@@ -33,6 +33,9 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   const [activeProvenance, setActiveProvenance] = useState<string | null>(null);
   const [saveNotification, setSaveNotification] = useState<string | null>(null);
 
+  const [isStampOverlayActive, setIsStampOverlayActive] = useState(true);
+
+  // Edit Mode Toggle Button
   const director = company.directors.find((d) => d.isSignatory) || company.directors[0];
 
   useEffect(() => {
@@ -233,6 +236,20 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                 <span>Edit Dokumen</span>
               </>
             )}
+          </button>
+
+          {/* e-Stamp Digital Overlay Toggle */}
+          <button
+            onClick={() => setIsStampOverlayActive(!isStampOverlayActive)}
+            className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs font-bold transition-all border ${
+              isStampOverlayActive
+                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-md shadow-emerald-500/10"
+                : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"
+            }`}
+            title="Toggle Pembubuhan e-Stamp & e-Signature Canvas Overlay"
+          >
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+            <span>e-Stamp: {isStampOverlayActive ? "ON" : "OFF"}</span>
           </button>
 
           {/* Quick Download Buttons */}
@@ -495,9 +512,21 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
               </p>
 
               <div className="pt-8 flex justify-end">
-                <div className="text-center space-y-12 min-w-[220px]">
+                <div className="text-center space-y-12 min-w-[240px] relative">
                   <p className="font-bold text-slate-200 uppercase tracking-wide">{company.legalName}</p>
-                  <div className="pt-4 border-t border-slate-700">
+
+                  <div className="pt-4 border-t border-slate-700 relative">
+                    {/* Digital e-Stamp & e-Signature Canvas Overlay */}
+                    {isStampOverlayActive && (
+                      <div className="absolute -top-12 right-2 bg-cyan-950/95 border-2 border-cyan-400 text-cyan-300 p-2.5 rounded-xl text-[10px] font-mono shadow-xl shadow-cyan-500/30 transform -rotate-6 animate-pulse flex items-center space-x-2.5">
+                        <ShieldCheck className="h-5 w-5 text-cyan-400 shrink-0" />
+                        <div className="text-left leading-tight">
+                          <p className="font-extrabold text-slate-100 uppercase tracking-wider">E-STAMP & SIGN VERIFIED</p>
+                          <p className="text-[9px] text-cyan-300 font-mono">Hash: {company.id.toUpperCase()}-2026-9F81A2B0</p>
+                          <p className="text-[9px] text-emerald-400 font-bold">✓ e-Meterai Rp 10.000 Valid (DJP)</p>
+                        </div>
+                      </div>
+                    )}
                     <p className="font-extrabold text-slate-100 text-sm">{director.fullName}</p>
                     <p className="text-[11px] text-slate-400 uppercase font-semibold">{director.position}</p>
                   </div>

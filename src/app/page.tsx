@@ -33,6 +33,8 @@ export default function Home() {
   const [projects] = useState<Project[]>(MOCK_PROJECTS);
   const [conflicts, setConflicts] = useState<ConflictAlert[]>(MOCK_CONFLICTS);
 
+  const [activeRole, setActiveRole] = useState<string>("ADMIN");
+
   const [contextState, setContextState] = useState<ContextState>({
     activeCompanyId: "aos",
     activeProjectId: "proj-aos-1",
@@ -201,6 +203,8 @@ export default function Home() {
         activeCompanyId={contextState.activeCompanyId}
         onCompanyChange={handleCompanyChange}
         unresolvedConflictCount={unresolvedConflictCount}
+        activeRole={activeRole}
+        onRoleChange={(role) => setActiveRole(role)}
       />
 
       {/* Main Workspace Split View */}

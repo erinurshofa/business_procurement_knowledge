@@ -1,10 +1,20 @@
-"use client";
-
 import React, { useState } from "react";
 import { Company, Person, CompanyExperience } from "@/types/procurement";
 import { getVerificationBadgeStyle } from "@/lib/consistencyEngine";
 import { formatIDR } from "@/lib/financialEngine";
-import { Building2, Users, Award, ShieldCheck, FileCheck2, Search } from "lucide-react";
+import {
+  Building2,
+  Users,
+  Award,
+  ShieldCheck,
+  FileCheck2,
+  Search,
+  UploadCloud,
+  Loader2,
+  CheckCircle2,
+  X,
+} from "lucide-react";
+import { OCRExtractionResult } from "@/lib/ocrEngine";
 
 interface KnowledgeExplorerProps {
   companies: Company[];
@@ -23,6 +33,9 @@ export const KnowledgeExplorer: React.FC<KnowledgeExplorerProps> = ({
 }) => {
   const [subTab, setSubTab] = useState<"company" | "people" | "experience">("company");
   const [searchTerm, setSearchTerm] = useState("");
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [ocrResult, setOcrResult] = useState<OCRExtractionResult | null>(null);
 
   const activeCompany = companies.find((c) => c.id === activeCompanyId) || companies[0];
   const companyExperiences = experiences.filter((e) => e.companyId === activeCompanyId);
@@ -33,8 +46,33 @@ export const KnowledgeExplorer: React.FC<KnowledgeExplorerProps> = ({
       p.skills.some((s) => s.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload-ocr", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setOcrResult(data.data);
+      }
+    } catch (err) {
+      console.error("Upload OCR error:", err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-900 overflow-hidden">
+    <div className="flex-1 flex flex-col h-full bg-slate-900 overflow-hidden relative">
       {/* Sub Navigation & Search Bar */}
       <div className="bg-slate-950/80 border-b border-slate-800 p-3 px-5 flex items-center justify-between">
         <div className="flex items-center space-x-2 text-xs">
@@ -73,18 +111,96 @@ export const KnowledgeExplorer: React.FC<KnowledgeExplorerProps> = ({
           </button>
         </div>
 
-        {/* Filter / Search Input */}
-        <div className="relative w-48">
-          <Search className="h-3.5 w-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Cari data terstruktur..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg py-1.5 pl-8 pr-3 text-[11px] text-slate-200 focus:outline-none focus:border-cyan-500/50"
-          />
+        <div className="flex items-center space-x-2">
+          {/* Upload & OCR Dropzone Button */}
+          <button
+            onClick={() => setIsUploadOpen(true)}
+            className="flex items-center space-x-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-all shadow-md"
+          >
+            <UploadCloud className="h-3.5 w-3.5" />
+            <span>Upload & OCR PDF</span>
+          </button>
+
+          {/* Filter / Search Input */}
+          <div className="relative w-40">
+            <Search className="h-3.5 w-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Cari data..."
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg py-1 pl-8 pr-3 text-xs text-slate-200 focus:outline-none focus:border-cyan-500/50"
+            />
+          </div>
         </div>
       </div>
+
+      {/* OCR Document Upload Modal */}
+      {isUploadOpen && (
+        <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-fadeIn">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <UploadCloud className="h-5 w-5 text-cyan-400" />
+                <h3 className="font-bold text-slate-100 text-sm">Upload & Engine OCR Dokumen Faktual</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setIsUploadOpen(false);
+                  setOcrResult(null);
+                }}
+                className="text-slate-400 hover:text-slate-200"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Unggah berkas SPK, Kontrak, BAST, NIB, atau Bukti Pajak BPE (PDF/Word/Gambar). Sistem AI OCR secara otomatis mengekstrak metadata nomor, tanggal, instansi, dan nilai finansial.
+            </p>
+
+            {/* Dropzone Input */}
+            <div className="border-2 border-dashed border-cyan-500/40 hover:border-cyan-400 rounded-xl p-6 text-center space-y-3 bg-slate-950/60 transition-all cursor-pointer relative">
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                onChange={handleFileUpload}
+                className="absolute inset-0 opacity-0 cursor-pointer"
+              />
+              <UploadCloud className="h-8 w-8 text-cyan-400 mx-auto animate-bounce" />
+              <div>
+                <p className="text-xs font-semibold text-cyan-300">Klik atau seret berkas ke sini</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">Mendukung format PDF, DOCX, PNG, JPG (Maks. 25MB)</p>
+              </div>
+            </div>
+
+            {uploading && (
+              <div className="flex items-center justify-center space-x-2 py-4 text-xs text-cyan-300">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Memproses ekstraksi OCR & verifikasi entitas...</span>
+              </div>
+            )}
+
+            {ocrResult && (
+              <div className="bg-slate-950 p-4 rounded-xl border border-emerald-500/40 space-y-2 text-xs animate-fadeIn">
+                <div className="flex items-center space-x-2 text-emerald-400 font-bold">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Ekstraksi OCR Berhasil (Skor Kepercayaan: {(ocrResult.confidenceScore * 100).toFixed(0)}%)</span>
+                </div>
+                <div className="space-y-1 text-slate-300 pt-1 border-t border-slate-800">
+                  <p><strong>Nama Berkas:</strong> {ocrResult.fileName}</p>
+                  <p><strong>Nomor Dokumen:</strong> <span className="font-mono text-cyan-400">{ocrResult.extractedFields.contractNumber || ocrResult.extractedFields.nibNumber}</span></p>
+                  <p><strong>Instansi Client:</strong> {ocrResult.extractedFields.clientName || "Dinas Sosial / Perikanan"}</p>
+                  {ocrResult.extractedFields.contractValueIDR && (
+                    <p><strong>Nilai Kontrak:</strong> <span className="text-emerald-400 font-bold">{formatIDR(ocrResult.extractedFields.contractValueIDR)}</span></p>
+                  )}
+                  <p><strong>Penandatangan:</strong> {ocrResult.extractedFields.signatoryName || "Direktur Perusahaan"}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">

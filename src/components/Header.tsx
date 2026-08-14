@@ -16,6 +16,8 @@ interface HeaderProps {
   activeCompanyId: string;
   onCompanyChange: (companyId: string) => void;
   unresolvedConflictCount: number;
+  activeRole?: string;
+  onRoleChange?: (role: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -23,6 +25,8 @@ export const Header: React.FC<HeaderProps> = ({
   activeCompanyId,
   onCompanyChange,
   unresolvedConflictCount,
+  activeRole = "ADMIN",
+  onRoleChange,
 }) => {
   const activeCompany = companies.find((c) => c.id === activeCompanyId) || companies[0];
 
@@ -50,25 +54,46 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Center: Tenant Multi-Company Switcher */}
-      <div className="flex items-center space-x-3 bg-slate-950/80 border border-slate-800 px-4 py-1.5 rounded-xl shadow-inner">
-        <div className="flex items-center space-x-2">
-          <Building2 className="h-4 w-4 text-cyan-400" />
-          <span className="text-xs text-slate-400">Active Tenant:</span>
+      {/* Center: Tenant Multi-Company & User Role Switcher */}
+      <div className="flex items-center space-x-3">
+        {/* Active Company Tenant */}
+        <div className="flex items-center space-x-2 bg-slate-950/80 border border-slate-800 px-3.5 py-1.5 rounded-xl shadow-inner">
+          <Building2 className="h-4 w-4 text-cyan-400 shrink-0" />
+          <span className="text-xs text-slate-400">Tenant:</span>
+          <div className="relative group">
+            <select
+              value={activeCompanyId}
+              onChange={(e) => onCompanyChange(e.target.value)}
+              className="appearance-none bg-transparent text-xs font-semibold text-slate-200 pr-7 cursor-pointer focus:outline-none"
+            >
+              {companies.map((c) => (
+                <option key={c.id} value={c.id} className="bg-slate-900 text-slate-200">
+                  {c.legalName} ({c.businessType})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="h-3.5 w-3.5 text-slate-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
-        <div className="relative group">
-          <select
-            value={activeCompanyId}
-            onChange={(e) => onCompanyChange(e.target.value)}
-            className="appearance-none bg-transparent text-xs font-semibold text-slate-200 pr-7 cursor-pointer focus:outline-none"
-          >
-            {companies.map((c) => (
-              <option key={c.id} value={c.id} className="bg-slate-900 text-slate-200">
-                {c.legalName} ({c.businessType})
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="h-3.5 w-3.5 text-slate-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none" />
+
+        {/* User Role Switcher (RBAC) */}
+        <div className="flex items-center space-x-2 bg-slate-950/80 border border-slate-800 px-3.5 py-1.5 rounded-xl shadow-inner">
+          <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-xs text-slate-400">Role:</span>
+          <div className="relative group">
+            <select
+              value={activeRole}
+              onChange={(e) => onRoleChange && onRoleChange(e.target.value)}
+              className="appearance-none bg-transparent text-xs font-bold text-cyan-400 pr-6 cursor-pointer focus:outline-none"
+            >
+              <option value="ADMIN" className="bg-slate-900 text-slate-200">👑 Admin / Owner</option>
+              <option value="PROCUREMENT_OFFICER" className="bg-slate-900 text-slate-200">📋 Procurement Officer</option>
+              <option value="FINANCE" className="bg-slate-900 text-slate-200">💰 Finance & Tax Specialist</option>
+              <option value="LEGAL_COMPLIANCE" className="bg-slate-900 text-slate-200">⚖️ Legal & Compliance User</option>
+              <option value="APPROVER" className="bg-slate-900 text-slate-200">✅ Approver Authority</option>
+            </select>
+            <ChevronDown className="h-3.5 w-3.5 text-cyan-400 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
       </div>
 

@@ -250,3 +250,38 @@ export interface ChatMessage {
     options: { label: string; value: string }[];
   };
 }
+
+export type UserRole =
+  | "ADMIN"
+  | "PROCUREMENT_OFFICER"
+  | "FINANCE"
+  | "LEGAL_COMPLIANCE"
+  | "APPROVER";
+
+export interface UserSession {
+  userId: string;
+  userName: string;
+  userEmail: string;
+  role: UserRole;
+  avatarUrl?: string;
+}
+
+export interface DocumentVersion {
+  id: string;
+  documentId: string;
+  versionNumber: string; // e.g. "v1.0", "v1.1", "v2.0"
+  modifiedBy: string;
+  modifiedAt: string;
+  changeSummary: string;
+  documentDataSnapshot: Partial<Project>;
+}
+
+export interface DigitalSignatureInfo {
+  signatoryName: string;
+  signatoryRole: string;
+  signedAt: string;
+  verificationHash: string;
+  stampUrl?: string;
+  signatureUrl?: string;
+  isOverlayActive: boolean;
+}
