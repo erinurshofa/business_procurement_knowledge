@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateProcurementPackageDocx } from "@/lib/docxGenerator";
-import { MOCK_COMPANIES, MOCK_PROJECTS, MOCK_PEOPLE } from "@/lib/mockData";
+import { getCompanyById, getProjectById, logGeneratedDocument } from "@/lib/supabaseService";
+import { MOCK_PEOPLE } from "@/lib/mockData";
 
 export async function GET(req: NextRequest) {
   try {
@@ -8,13 +9,19 @@ export async function GET(req: NextRequest) {
     const companyId = searchParams.get("companyId") || "aos";
     const projectId = searchParams.get("projectId") || "proj-1";
 
-    const company = MOCK_COMPANIES.find((c) => c.id === companyId) || MOCK_COMPANIES[0];
-    const project = MOCK_PROJECTS.find((p) => p.id === projectId) || MOCK_PROJECTS[0];
+    // 1. Fetch live data from Supabase (or fallback to local dataset)
+    const company = await getCompanyById(companyId);
+    const project = await getProjectById(projectId);
     const person = MOCK_PEOPLE[0];
 
+    // 2. Generate native DOCX file with company kop, director, and project details
     const docxBuffer = await generateProcurementPackageDocx(company, project, person);
 
+    const documentNumber = company.branding.numberingPattern || `001/SP-${company.id.toUpperCase()}/VIII/2026`;
     const fileName = `Paket_Procurement_${company.id.toUpperCase()}_2026.docx`;
+
+    // 3. Log document generation event to Supabase generated_documents table
+    await logGeneratedDocument(company.id, project.id, "Surat Penawaran Administrasi", documentNumber, fileName);
 
     return new NextResponse(new Uint8Array(docxBuffer), {
       status: 200,
@@ -31,3 +38,4 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
