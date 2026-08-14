@@ -69,6 +69,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   const [saveNotification, setSaveNotification] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isStampOverlayActive, setIsStampOverlayActive] = useState(true);
+  const [isLogoVisible, setIsLogoVisible] = useState(true);
 
   const director = company.directors.find((d) => d.isSignatory) || company.directors[0];
 
@@ -638,6 +639,20 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
           )}
         </div>
 
+        {/* Logo Kop Toggle */}
+        <button
+          onClick={() => setIsLogoVisible(!isLogoVisible)}
+          className={`flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs font-bold transition-all border shrink-0 ${
+            isLogoVisible
+              ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-md"
+              : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"
+          }`}
+          title="Toggle Logo Kop Surat Perusahaan"
+        >
+          <Building className="h-3.5 w-3.5 text-cyan-400" />
+          <span>Logo Kop: {isLogoVisible ? "ON" : "OFF"}</span>
+        </button>
+
         {/* e-Stamp Overlay Toggle */}
         <button
           onClick={() => setIsStampOverlayActive(!isStampOverlayActive)}
@@ -700,10 +715,26 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
           </div>
 
           {/* --------------------------------------------------------- */}
-          {/* EDITABLE KOP SURAT (Letterhead Header)                    */}
+          {/* EDITABLE KOP SURAT WITH AUTHENTIC COMPANY LOGO            */}
           {/* --------------------------------------------------------- */}
-          <div className="border-b-2 border-slate-700 pb-4 flex justify-between items-start">
-            <div className="space-y-1 flex-1 pr-6">
+          <div className="border-b-2 border-slate-700 pb-4 flex items-center justify-between gap-4">
+            
+            {/* Authentic Company Logo */}
+            {isLogoVisible && (
+              <div className="flex-shrink-0 flex items-center justify-center p-2 bg-slate-950/80 border border-slate-800 rounded-xl shadow-md">
+                <img
+                  src={`/images/logos/${company.id}_logo.png`}
+                  alt={`Logo ${company.legalName}`}
+                  className="h-16 w-auto object-contain max-w-[100px]"
+                  onError={(e) => {
+                    // Fallback to stylized building badge if logo image not found
+                    (e.currentTarget as HTMLElement).style.display = "none";
+                  }}
+                />
+              </div>
+            )}
+
+            <div className="space-y-1 flex-1 pr-4">
               {isEditMode ? (
                 <>
                   <input
@@ -739,7 +770,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
               )}
             </div>
 
-            <div className="text-right">
+            <div className="text-right flex-shrink-0">
               {isEditMode ? (
                 <div className="space-y-1">
                   <label className="text-[10px] text-slate-400 block font-semibold">No. Dokumen:</label>
@@ -747,7 +778,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                     type="text"
                     value={letterData.docNumber}
                     onChange={(e) => setLetterData({ ...letterData, docNumber: e.target.value })}
-                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs font-mono text-cyan-400 w-56 focus:outline-none focus:border-cyan-500 font-bold"
+                    className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs font-mono text-cyan-400 w-52 focus:outline-none focus:border-cyan-500 font-bold"
                   />
                 </div>
               ) : (
